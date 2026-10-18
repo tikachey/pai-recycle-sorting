@@ -1,0 +1,93 @@
+# .gitignore (Python project)
+
+# ===== 認証情報の念押し(グローバルにもあるが念のため重複定義) =====
+.env
+.env.*
+!.env.example
+service_account*.json
+credentials*.json
+secrets*.json
+*.key
+*.pem
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.egg-info/
+build/
+dist/
+*.manifest
+*.spec
+
+# ===== Jupyter =====
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ===== Streamlit / Flask / Django(必要に応じて) =====
+.streamlit/secrets.toml
+instance/
+.flaskenv
+
+# ===== データファイル(プロジェクトごとに調整) =====
+# デフォルトは大きなデータを除外、サンプルだけ含める方針
+data/raw/
+data/processed/
+data/external/
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.feather
+*.db
+*.sqlite
+*.sqlite3
+!data/sample/**
+!example/**
+!**/example_*.csv
+
+# ===== モデル・成果物 =====
+*.pkl
+*.h5
+*.pth
+*.onnx
+models/
+checkpoints/
+
+# ===== ログ・出力 =====
+logs/
+output/
+outputs/
+*.log
+
+# ===== OS / Editor =====
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+.idea/
+*.swp
+
+# ===== 一時 =====
+*.tmp
+*.bak
+*.cache
+~$*
+.~lock.*
+
+# ===== プロジェクト固有 =====
+# このプロジェクト独自に除外したいものをここに追加
+# 例:
+# generated_reports/
+# scraped_html/

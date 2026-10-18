@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>説明資料 PAI最終課題 tikachey</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+  :root { --ink: #1d232b; --sub: #5a6573; --line: #d7dde4; --accent: #1f5fae; --soft: #f3f6fa; }
+  * { box-sizing: border-box; }
+  body { font-family: "Yu Gothic", "YuGothic", "Meiryo", "Noto Sans JP", sans-serif; color: var(--ink);
+         font-size: 10pt; line-height: 1.7; margin: 0; background: #fff; }
+  h1 { font-size: 18pt; line-height: 1.35; margin: 0 0 4px; letter-spacing: 0.02em; }
+  .subtitle { color: var(--sub); font-size: 10.5pt; margin: 0 0 10px; }
+  .meta { font-size: 9pt; color: var(--sub); border-top: 2px solid var(--accent); padding-top: 6px; margin-bottom: 14px; }
+  h2 { font-size: 13pt; margin: 18px 0 6px; padding-left: 8px; border-left: 5px solid var(--accent); break-after: avoid; }
+  h3 { font-size: 11pt; margin: 12px 0 4px; break-after: avoid; }
+  p { margin: 4px 0 8px; }
+  ul, ol { margin: 4px 0 8px; padding-left: 1.4em; }
+  li { margin: 2px 0; }
+  figure { margin: 8px 0 12px; break-inside: avoid; }
+  figure img { width: 100%; border: 1px solid var(--line); border-radius: 4px; display: block; }
+  figcaption { font-size: 8.8pt; color: var(--sub); margin-top: 3px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 9pt; margin: 6px 0 10px; break-inside: avoid; }
+  th, td { border: 1px solid var(--line); padding: 4px 6px; vertical-align: top; text-align: left; }
+  th { background: var(--soft); font-weight: 600; }
+  td.num { text-align: right; white-space: nowrap; }
+  .box { background: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; margin: 8px 0 12px; break-inside: avoid; }
+  .kpi { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0 12px; }
+  .kpi div { background: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; text-align: center; }
+  .kpi b { display: block; font-size: 15pt; color: var(--accent); line-height: 1.2; }
+  .kpi span { font-size: 8.5pt; color: var(--sub); }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 8.8pt; background: var(--soft); padding: 0 3px; border-radius: 3px; }
+  .page-break { break-before: page; }
+  svg text { font-family: "Yu Gothic", "Meiryo", sans-serif; }
+</style>
+</head>
+<body>
+
+<h1>AI × ロボットによる資源ごみ分別</h1>
+<p class="subtitle">Gemini Robotics-ER 2 の画像認識と深度計測を組み合わせ、Franka Panda アームが机の上の資源ごみを 1 個ずつ分別する閉ループシステム（MuJoCo シミュレーション）</p>
+<div class="meta">Physical AI 応用編1 最終課題 説明資料 ／ Omnicampus アカウント: tikachey ／ 2026 年 10 月<br>
+コード: GitHub <code>tikachey/pai-recycle-sorting</code> ／ 動画: YouTube「PAI最終課題_tikachey」（1 倍速・約 1 分 40 秒）</div>
+
+<h2>1. 課題の概要と目的</h2>
+<p>家庭から出る資源ごみは、ペットボトル・缶・びん・紙パックのように品目ごとに分けて初めて再資源化できます。本課題では、この「見て判断し、つかんで分ける」作業を AI とロボットアームで自動化しました。</p>
+<p>ねらいは、画像を見て判断できる AI（VLM: 画像と言語を扱う大規模モデル）を<b>推論だけ</b>で使い、その判断を 3 次元の位置推定・把持計画・動作制御までつないで、実際に物を動かすところまで閉じたシステムにすることです。講座サンプルの「Gemini Robotics-ER を試す」は画像に注釈を付けるところまで、「Pick and Place（UR3）」は決め打ちの位置をつかむところまでなので、本作はこの 2 つをつないで発展させた位置づけです。</p>
+
+<div class="kpi">
+  <div><b>7 / 7</b><span>本番実行で正しい箱に入った数</span></div>
+  <div><b>28 / 28</b><span>AI の品目判定の正解数</span></div>
+  <div><b>1.8 mm</b><span>位置推定の平均誤差（立った物）</span></div>
+  <div><b>130 / 130</b><span>評価モード 20 配置で正しい箱に入った数</span></div>
+</div>
+
+<div class="two">
+<figure>
+  <img src="img/action.png" alt="動画の一場面">
+  <figcaption>図 1　動画の一場面。右上の小窓は直前の AI の認識結果、下の字幕は次の動作。倒れたペットボトルと缶も含む 7 個の資源ごみを分別する。</figcaption>
+</figure>
+<figure>
+  <img src="img/ai_view.png" alt="AI の認識結果">
+  <figcaption>図 2　AI の認識結果（1 回目）。7 個すべてを正しい区分で検出（確信度 0.96〜0.99）。「NEXT」が次につかむ物。</figcaption>
+</figure>
+</div>
+
+<h2>2. システム構成</h2>
+<figure>
+<svg viewBox="0 0 760 250" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#1f5fae"/></marker></defs>
+  <g font-size="12.5" fill="#1d232b">
+    <rect x="10" y="20" width="130" height="62" rx="8" fill="#eef3fa" stroke="#1f5fae"/>
+    <text x="75" y="45" text-anchor="middle" font-weight="700">固定 RGB-D カメラ</text>
+    <text x="75" y="66" text-anchor="middle" font-size="11">カラー画像＋深度</text>
+
+    <rect x="190" y="8" width="170" height="62" rx="8" fill="#fff7e8" stroke="#d48a10"/>
+    <text x="275" y="32" text-anchor="middle" font-weight="700">Gemini Robotics-ER 2</text>
+    <text x="275" y="53" text-anchor="middle" font-size="11">枠・品目名・分別区分（JSON）</text>
+
+    <rect x="190" y="92" width="170" height="62" rx="8" fill="#eef3fa" stroke="#1f5fae"/>
+    <text x="275" y="116" text-anchor="middle" font-weight="700">3D 推定（深度）</text>
+    <text x="275" y="137" text-anchor="middle" font-size="11">位置・向き・高さ・倒れ判定</text>
+
+    <rect x="410" y="50" width="150" height="62" rx="8" fill="#eef3fa" stroke="#1f5fae"/>
+    <text x="485" y="74" text-anchor="middle" font-weight="700">対象と把持の計画</text>
+    <text x="485" y="95" text-anchor="middle" font-size="11">背の高い物から・指の向き</text>
+
+    <rect x="610" y="50" width="140" height="62" rx="8" fill="#eef3fa" stroke="#1f5fae"/>
+    <text x="680" y="74" text-anchor="middle" font-weight="700">Franka Panda</text>
+    <text x="680" y="95" text-anchor="middle" font-size="11">逆運動学で把持・運搬</text>
+
+    <path d="M140,42 L188,38" stroke="#1f5fae" stroke-width="2" marker-end="url(#ar)" fill="none"/>
+    <path d="M140,62 L188,118" stroke="#1f5fae" stroke-width="2" marker-end="url(#ar)" fill="none"/>
+    <path d="M275,70 L275,90" stroke="#1f5fae" stroke-width="2" marker-end="url(#ar)" fill="none"/>
+    <path d="M360,120 L408,92" stroke="#1f5fae" stroke-width="2" marker-end="url(#ar)" fill="none"/>
+    <path d="M560,81 L608,81" stroke="#1f5fae" stroke-width="2" marker-end="url(#ar)" fill="none"/>
+    <path d="M680,112 L680,210 L75,210 L75,84" stroke="#8a96a5" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#ar)" fill="none"/>
+    <text x="380" y="232" text-anchor="middle" font-size="11.5" fill="#5a6573">1 個入れるたびにカメラの視界をあけて再観察（机が空になるまで繰り返す）</text>
+  </g>
+</svg>
+<figcaption>図 3　処理の流れ。AI が「何がどこにあるか」を判断し、深度で 3 次元の位置に直し、アームが 1 個ずつ分別する。</figcaption>
+</figure>
+
+<table>
+  <tr><th style="width:22%">要素</th><th>内容</th></tr>
+  <tr><td>シミュレータ</td><td>MuJoCo 3.15（Python）。シーンは MjSpec でコードから構築（机・色分けした回収箱 4 つ・品目 4 種）。GPU なしのノート PC で動作。</td></tr>
+  <tr><td>ロボット</td><td>Franka Emika Panda（7 自由度＋平行グリッパ、MuJoCo Menagerie のモデル、Apache-2.0）。</td></tr>
+  <tr><td>AI（推論のみ）</td><td>Gemini Robotics-ER 2 Preview（Google の身体性推論 VLM、無料枠）。画像 1 枚につき 1 回呼び出し、物体ごとの枠・品目名・分別区分・確信度を JSON で受け取る。</td></tr>
+  <tr><td>品目</td><td>ペットボトル（キャップ・ラベル付き）、アルミ缶、びん（茶色）、紙パック。回転体メッシュなどで形を作り、ラベル色や向き、倒れた状態を乱数で変える。</td></tr>
+  <tr><td>制御</td><td>減衰最小二乗法の逆運動学、躍度最小の滑らかな軌道、直線補間の下降・上昇。</td></tr>
+</table>
+
+<h2>3. 処理の流れ</h2>
+<ol>
+  <li><b>観察</b>：アームをカメラの視界の外へ退避させ、固定カメラでカラー画像と深度画像を撮る。</li>
+  <li><b>認識（AI）</b>：カラー画像を Gemini Robotics-ER 2 に送り、机の上の資源ごみの枠と分別区分を得る（回収箱の中の物やアームは無視するよう指示）。</li>
+  <li><b>3D 推定</b>：枠の中の深度を 3 次元の点群に直し、物体の位置・高さ・向き・倒れているかを求める。</li>
+  <li><b>計画と実行</b>：背の高い物から 1 個選び、つかむ高さと指の向きを決めて把持、対応する回収箱へ運んで離す。</li>
+  <li><b>再観察</b>：1 に戻る。机の上に何も検出されなくなったら終了。</li>
+</ol>
+
+
+<h2>4. 工夫した点</h2>
+
+<h3>4.1 AI の出力だけで動かす</h3>
+<p>シミュレータは物体の正確な位置を知っていますが、それを制御に使うと実機では成り立ちません。本作では位置・向き・高さ・倒れているかをすべてカメラ画像から推定し、シミュレータの正解値は<b>結果の評価とログにだけ</b>使いました。</p>
+
+<h3>4.2 深度と組み合わせた 3D 推定（立った物の誤差 約 5 mm → 1.8 mm）</h3>
+<p>最初は枠内の点の重心を使っていましたが、カメラからは手前側の面しか見えないため、奥行き方向に約 5 mm の偏りが出ました。ボトルのキャップ上面・缶のふた・紙パックの上面は全体がカメラから見えることに着目し、<b>最も高い面の薄い層だけの重心</b>を位置とする方法に変えたところ、本番の立った物 5 個で平均誤差 1.8 mm（最大 2.8 mm）になりました。同じ層の点の主軸から紙パックの向きを、高さと細長さから「倒れているか」を判定しています。</p>
+<p>倒れた物は誤差が大きく、本番では缶 4.1 mm、ペットボトル 44.7 mm でした。ボトルは首側が細いため最も高い面の中心が軸方向にずれますが（軸と直角方向は 0.3 mm）、胴の上で挟む位置が変わるだけで把持には成功しています。7 個の平均は 8.2 mm（動画の最後に表示）。</p>
+<p>物が重なって写ると、AI の枠どうしも重なります。手前に立つびんが紙パックの枠に大きく入り込み、「紙パック」としてびんの位置を推定してしまう失敗が評価で 1 件見つかりました。そこで、重なった部分の画素は中心がより近い枠の物体だけに割り当て、さらに<b>AI の品目と深度で測った高さが矛盾する検出</b>（高さ 20 cm の「紙パック」など）はその回は保留して、他の物を片付けた後の再観察に回すようにしました。</p>
+
+<h3>4.3 把持の計画</h3>
+<ul>
+  <li><b>背の高い物から取る</b>：ハンドの胴体は幅が約 20 cm あり、缶をつかむ高さまで下りると隣のボトルに当たって倒していました。ボトル → 缶 → 紙パックの順に取れば、ハンドの下に自分より高い物が残りません。</li>
+  <li><b>指を閉じる向き＝運ぶ向き</b>：キャップを 2 本の指で挟んだボトルは、指と指を結ぶ線を軸に振り子のように揺れます。運ぶ向きがこの軸と直交していると、加速のたびに揺れて抜け落ちました。指の軸を運搬方向にそろえると、揺らす力が生じなくなりました。</li>
+  <li><b>倒れた物</b>：胴の中心の高さを、軸と直角に挟みます。</li>
+  <li><b>高い位置から近づく</b>：上空 30 cm まで移動してからまっすぐ下ろし、移動中に周りを引っかけないようにしました。</li>
+  <li><b>箱の中の投入位置をずらす</b>：同じ箱に入れるたびに四隅を順に使い、物が積み重なって縁に引っかかるのを防ぎます。</li>
+</ul>
+
+<h3>4.4 閉ループと失敗時の扱い</h3>
+<p>1 個入れるたびに撮り直して AI に認識させるので、取り損ねた物や途中で倒れた物も次の観察で拾い直せます。同じ場所で 2 回失敗した物は諦めて次へ進み、無限ループを防ぎます。</p>
+
+<h3>4.5 シミュレーションで見つかった落とし穴</h3>
+<table>
+  <tr><th style="width:30%">症状</th><th style="width:35%">原因</th><th>対策</th></tr>
+  <tr><td>びん（190 g）だけ持ち上がらない</td><td>標準のグリッパの握力が約 1 N しかない</td><td>サーボの剛性を上げて約 20 N に</td></tr>
+  <tr><td>缶をつかんでも運搬中に抜ける</td><td>小さな箱形の指パッドと円柱の接触判定で、指が缶に約 2 cm めり込んでいた</td><td>円柱の当たり判定を多角柱メッシュ（凸包）に変更し、めり込みを約 1 mm に</td></tr>
+  <tr><td>箱に入ったのに「失敗」と判定</td><td>立ったボトルの重心が壁の高さをわずかに超えていた</td><td>判定を「重心が箱の内側で、壁の高さ＋5 cm 未満」に</td></tr>
+</table>
+<p>多くの配置を短時間で試すため、AI の代わりに「正解の物体をカメラ画像に投影した枠」を渡す評価モードを作りました。枠から先（深度による 3D 推定・把持・運搬）は本番とまったく同じ処理です。成功率はこのモードで測っています。</p>
+
+<h3>4.6 無料枠での運用</h3>
+<p>AI の応答は画像のハッシュごとに保存し、同じ場面の再実行では API を呼びません（物理演算が決定的なので、字幕を直しただけの動画なら API なしで作り直せます）。1 回の分別で呼び出すのは 8 回（7 個＋最後の確認）です。</p>
+
+<h2>5. 結果</h2>
+<table>
+  <tr><th>条件</th><th>結果</th></tr>
+  <tr><td>本番（Gemini Robotics-ER 2・デモ配置 7 個、うち 2 個は倒れた状態）</td><td>7 / 7 個を正しい箱へ。AI 呼び出し 8 回。品目判定 28 / 28 件正解（確信度 0.96〜0.99）、倒れ判定 13 / 13 件正解。位置誤差は立った物で平均 1.8 mm、全 7 個で 8.2 mm。動画 101.5 秒（1 倍速）。</td></tr>
+  <tr><td>評価モード・標準配置（立った 6 個 × 10 通り）</td><td>60 / 60 個（100 %）。全配置で把持 6 回＋確認 1 回、やり直しなし。位置誤差 平均 約 2 mm。</td></tr>
+  <tr><td>評価モード・デモ配置（倒れた物を含む 7 個 × 10 通り）</td><td>70 / 70 個（100 %）。倒れた物の把持 21 回はすべて成功。取り損ね 1 回は次の観察で拾い直した。</td></tr>
+</table>
+<table>
+  <tr><th>改良の段階</th><th>成功率</th></tr>
+  <tr><td>初版（枠内重心で位置推定、取る順はカメラに近い順）</td><td class="num">4 / 6</td></tr>
+  <tr><td>上面重心・背の高い順・倒れ対応・指の向き調整</td><td class="num">27 / 30</td></tr>
+  <tr><td>円柱の当たり判定を凸包メッシュに（標準配置）</td><td class="num">60 / 60</td></tr>
+  <tr><td>倒れた物を含むデモ配置で評価</td><td class="num">69 / 70</td></tr>
+  <tr><td>重なった枠の画素割り当て＋品目と高さの矛盾チェック</td><td class="num">70 / 70</td></tr>
+</table>
+
+<h2>6. 考察と今後</h2>
+<p>AI は学習なし（推論のみ）でも、品目の判定はほぼ完璧でした。一方で、成功率を左右したのは「どこをどう挟むか」「どの順で取るか」といった把持の計画と、物理シミュレーションの細部でした。AI の判断を物理的な動作に落とし込む部分にこそ工夫の余地がある、というのが一番の学びです。</p>
+<p>実機に持ち込む場合の課題として、次の点を考えています。</p>
+<ul>
+  <li><b>深度の欠損</b>：透明なボトルは実際の深度カメラで測りにくく、AI の枠と形の事前知識で補う必要がある。</li>
+  <li><b>現実の多様さ</b>：潰れた缶、ラベルのないボトル、汚れ、密集状態。吸着ハンドや押して離す動作が要る。</li>
+  <li><b>速さ</b>：1 個あたり約 12 秒（観察 2 秒・把持から投入 7 秒・退避 2 秒）。並列化で短縮できる。</li>
+  <li><b>発展</b>：実機アーム（SO-101 など）での再現、「今日は缶・びんの日」といった自然言語の指示、模倣学習。</li>
+</ul>
+
+<h2>7. 使用した素材と参考</h2>
+<ul>
+  <li>MuJoCo（Google DeepMind）／ MuJoCo Menagerie の Franka Emika Panda（Apache-2.0、把持力のみ変更）</li>
+  <li>Gemini API（Gemini Robotics-ER 2 Preview、無料枠）</li>
+  <li>講座の最終課題サンプル「Gemini Robotics-ER 1.6 を試す」「Pick and Place Task（UR3）」を出発点とした</li>
+</ul>
+
+</body>
+</html>
